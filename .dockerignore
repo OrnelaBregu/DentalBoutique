@@ -1,0 +1,15 @@
+.git
+.gitignore
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.env
+.env.*
+venv/
+env/
+.venv/
+data/
+*.md
+*.docx
+render.yaml
