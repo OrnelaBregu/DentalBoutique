@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: dentalboutique-rag
+    env: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --workers 2 --threads 2 --timeout 180 --bind 0.0.0.0:$PORT app:app
+    autoDeploy: true
+    disk:
+      name: dentalboutique-data
+      mountPath: /var/data
+      sizeGB: 5
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.6
+      - key: VECTOR_STORE_PATH
+        value: /var/data/chroma
+      - key: MODEL_CACHE_DIR
+        value: /var/data/model_cache
+      - key: FEEDBACK_FILE_PATH
+        value: /var/data/feedback.jsonl
+      # Keep extracted images under Flask's static path.
+      - key: EXTRACTED_IMAGES_DIR
+        value: /opt/render/project/src/static/indexed_images
+      - key: TOP_K
+        value: "5"
+      - key: IMAGE_TOP_K
+        value: "3"
+      - key: IMAGE_MIN_SIMILARITY
+        value: "0.22"
+      - key: FEEDBACK_TOP_K
+        value: "2"
+      - key: FEEDBACK_MIN_SIMILARITY
+        value: "0.35"
+      # Set one of these in Render dashboard as secrets.
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        value: openai/gpt-4o
+    postDeployCommand: python -m rag.ingestion
