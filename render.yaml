@@ -39,4 +39,3 @@ services:
         sync: false
       - key: LLM_MODEL
         value: openai/gpt-4o
-    postDeployCommand: python -m rag.ingestion
