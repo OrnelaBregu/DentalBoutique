@@ -49,6 +49,7 @@ FEEDBACK_FILE_PATH = os.getenv(
 
 # Retrieval
 TOP_K = int(os.getenv("TOP_K", "5"))
+HISTORY_MAX_TURNS = int(os.getenv("HISTORY_MAX_TURNS", "4"))
 IMAGE_TOP_K = int(os.getenv("IMAGE_TOP_K", "3"))
 IMAGE_MIN_SIMILARITY = float(os.getenv("IMAGE_MIN_SIMILARITY", "0.22"))
 FEEDBACK_TOP_K = int(os.getenv("FEEDBACK_TOP_K", "2"))

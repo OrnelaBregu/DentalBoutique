@@ -36,6 +36,7 @@
     const roleBtns = document.querySelectorAll('.role-btn');
 
     let currentRole = 'patient';
+    const chatHistory = [];
 
     roleBtns.forEach(btn => {
       btn.addEventListener('click', () => {
@@ -150,10 +151,16 @@
         const res = await fetch('/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message, role: currentRole })
+          body: JSON.stringify({
+            message,
+            role: currentRole,
+            history: chatHistory.slice(-8)
+          })
         });
         const data = await res.json();
         const text = data.response || (res.ok ? 'No response.' : 'Something went wrong.');
+        chatHistory.push({ role: 'user', content: message });
+        chatHistory.push({ role: 'assistant', content: text });
         appendMessage(
           text,
           false,

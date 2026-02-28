@@ -1,11 +1,42 @@
 """Flask app: chat UI with RAG chat and answer feedback."""
+from datetime import datetime, timezone
 
 from flask import Flask, render_template, request, jsonify
 
 from rag.feedback import record_feedback
+from rag.ingestion import run_ingestion
 from rag.retriever import query
 
 app = Flask(__name__)
+
+
+def _run_slash_command(message: str, role: str) -> dict:
+    """Handle slash commands from chat input."""
+    command = (message or "").strip().lower()
+    if command in {"/help", "/?"}:
+        return {
+            "response": (
+                "Available slash commands:\n"
+                "- /help: show this list\n"
+                "- /reindex: rebuild vectors from company documents"
+            ),
+            "images": [],
+        }
+    if command == "/reindex":
+        started_at = datetime.now(timezone.utc)
+        run_ingestion()
+        return {
+            "response": (
+                "Reindex complete.\n"
+                f"- role: {role}\n"
+                f"- started_at: {started_at.isoformat()}"
+            ),
+            "images": [],
+        }
+    return {
+        "response": "Unknown slash command. Try /help.",
+        "images": [],
+    }
 
 
 @app.route("/")
@@ -21,13 +52,22 @@ def chat():
         body = request.get_json() or {}
         message = (body.get("message") or "").strip()
         role = (body.get("role") or "patient").lower()
+        history = body.get("history") or []
         if role not in ("patient", "staff"):
             role = "patient"
 
         if not message:
             return jsonify({"response": "Please enter a question."}), 400
 
-        rag_result = query(question=message, role=role)
+        if message.startswith("/"):
+            slash_result = _run_slash_command(message, role)
+            return jsonify(slash_result)
+
+        rag_result = query(
+            question=message,
+            role=role,
+            history=history if isinstance(history, list) else [],
+        )
         return jsonify(
             {
                 "response": rag_result.get("text", ""),

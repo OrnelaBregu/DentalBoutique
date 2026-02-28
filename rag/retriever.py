@@ -11,6 +11,7 @@ from llama_index.vector_stores.chroma import ChromaVectorStore
 from sentence_transformers import SentenceTransformer
 
 from config import (
+    HISTORY_MAX_TURNS,
     IMAGE_EMBEDDING_MODEL,
     IMAGE_MIN_SIMILARITY,
     IMAGE_TOP_K,
@@ -178,21 +179,77 @@ def _requested_topic(question: str) -> str | None:
     return None
 
 
-def query(question: str, role: str = "patient") -> dict[str, Any]:
+def _normalize_history(history: list[dict[str, str]] | None) -> list[dict[str, str]]:
+    """Keep only valid user/assistant turns and cap history length."""
+    if not history:
+        return []
+    turns: list[dict[str, str]] = []
+    for item in history:
+        if not isinstance(item, dict):
+            continue
+        turn_role = str(item.get("role", "")).strip().lower()
+        content = str(item.get("content", "")).strip()
+        if turn_role not in {"user", "assistant"} or not content:
+            continue
+        turns.append({"role": turn_role, "content": content})
+    max_items = max(0, HISTORY_MAX_TURNS * 2)
+    if max_items and len(turns) > max_items:
+        return turns[-max_items:]
+    return turns
+
+
+def _rewrite_question_with_history(
+    question: str, history: list[dict[str, str]]
+) -> str:
+    """Rewrite follow-up into a standalone retrieval query."""
+    if not history:
+        return question
+    history_lines = []
+    for turn in history:
+        speaker = "User" if turn["role"] == "user" else "Assistant"
+        history_lines.append(f"{speaker}: {turn['content']}")
+    prompt = (
+        "Rewrite the final user question into a standalone query for document retrieval.\n"
+        "Rules:\n"
+        "- Preserve original intent and domain terms.\n"
+        "- Include relevant context from conversation.\n"
+        "- Keep it concise (one sentence).\n"
+        "- Return only the rewritten query.\n\n"
+        f"Conversation:\n{chr(10).join(history_lines)}\n\n"
+        f"Final user question: {question}"
+    )
+    try:
+        rewritten = Settings.llm.complete(prompt).text.strip()
+    except Exception:
+        return question
+    if not rewritten:
+        return question
+    return rewritten
+
+
+def query(
+    question: str, role: str = "patient", history: list[dict[str, str]] | None = None
+) -> dict[str, Any]:
     """
     Run a RAG query: retrieve top-k chunks, then generate an answer with role-specific system prompt.
     role: "patient" | "staff"
     """
     index = _get_index()
+    clean_history = _normalize_history(history)
+    standalone_question = _rewrite_question_with_history(question, clean_history)
     retriever = index.as_retriever(similarity_top_k=TOP_K)
-    nodes = retriever.retrieve(question)
+    nodes = retriever.retrieve(standalone_question)
 
     # Filter out very low relevance chunks (score below threshold)
     MIN_SCORE = 0.3
     relevant_nodes = [n for n in nodes if n.score is None or n.score >= MIN_SCORE]
 
     # Guardrail: do not return images unless the user explicitly asks for visuals.
-    images = _retrieve_images(question) if _is_explicit_image_request(question) else []
+    images = (
+        _retrieve_images(standalone_question)
+        if _is_explicit_image_request(question)
+        else []
+    )
 
     if not relevant_nodes:
         if role == "staff":
@@ -221,7 +278,7 @@ def query(question: str, role: str = "patient") -> dict[str, Any]:
         }
 
     context = "\n\n---\n\n".join(node.get_content() for node in relevant_nodes)
-    feedback_examples = get_positive_feedback_context(question)
+    feedback_examples = get_positive_feedback_context(standalone_question)
     feedback_context = ""
     if feedback_examples:
         formatted = []
@@ -242,6 +299,7 @@ def query(question: str, role: str = "patient") -> dict[str, Any]:
         f"Use only the following context from DentalBoutique documents to answer the question. "
         f"If the context doesn't contain enough information, say so.\n\n"
         f"{feedback_context}"
+        f"Retrieval query used:\n{standalone_question}\n\n"
         f"Context:\n{context}\n\n"
         f"Question: {question}"
     )

@@ -46,9 +46,13 @@ A Flask web app that lets **patients** and **staff** ask questions grounded in D
 
 - Choose **Patient** or **Staff** at the top; answers are tailored to that role.
 - Type a question and press Send. The bot answers using only the ingested company documents.
+- Follow-up questions keep recent chat context (multi-turn memory).
 - Images are returned only when explicitly requested (e.g., "show me implant photos").
 - Procedure guardrails are applied so image topic must match the requested treatment.
 - Use 👍/👎 on assistant answers; positive feedback is reused as guidance for similar future questions.
+- Slash commands:
+  - `/help` shows available commands
+  - `/reindex` rebuilds vectors from `company_*.md` and `company_*.docx`
 
 ## Optional env vars (in `.env`)
 
@@ -63,6 +67,7 @@ A Flask web app that lets **patients** and **staff** ask questions grounded in D
 | `IMAGE_EMBEDDING_MODEL` | Local image embedding model | `sentence-transformers/clip-ViT-B-32` |
 | `MODEL_CACHE_DIR` | Local model cache directory | `./data/model_cache` |
 | `TOP_K` | Number of chunks to retrieve per query | `5` |
+| `HISTORY_MAX_TURNS` | Number of prior turns used for follow-up rewrite | `4` |
 | `IMAGE_TOP_K` | Number of candidate images to return | `3` |
 | `IMAGE_MIN_SIMILARITY` | Similarity threshold for image return | `0.22` |
 | `FEEDBACK_FILE_PATH` | JSONL log path for feedback events | `./data/feedback.jsonl` |
