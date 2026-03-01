@@ -1,78 +1,138 @@
-Precise Project Description
-This project is a Flask-based, role-aware multimodal RAG assistant for a dental clinic knowledge base.
-It answers questions for two personas (patient, staff) using only ingested internal documents, and can optionally return relevant document images only when explicitly requested.
-End-to-end flow
-Ingestion (rag/ingestion.py)
-Reads company_*.md and company_*.docx
-Extracts DOCX text + images
-Chunks text via MarkdownNodeParser
-Builds two Chroma collections:
-dental_boutique_text (text chunks)
-dental_boutique_images (image embeddings + metadata)
-Rebuilds collections each run (fresh index)
-Retrieval + Generation (rag/retriever.py)
-Retrieves top-k text chunks by vector similarity
-Filters weak text matches (MIN_SCORE)
-Applies role-specific prompt (rag/prompts.py)
-Generates final answer with LLM
-Image retrieval guardrails:
-only if user explicitly asks for images/photos
-topic matching filter (e.g., implant query should not return root-canal-topic images)
-similarity threshold for image acceptance
-Feedback loop (rag/feedback.py, /feedback)
-UI captures 👍/👎 per answer
-Stores all feedback in JSONL
-Indexes only positive feedback in dental_boutique_feedback_positive
-On future similar questions, pulls positive examples and uses them as answer-style guidance
-Frontend (templates/index.html)
-Role selector, chat thread, optional image rendering
-Feedback controls with thumbs up/down
-Models/Tech Used by RAG Stage
-Text embedding model
-BAAI/bge-small-en-v1.5
-Used for:
-text document chunk embeddings
-text query embeddings
-feedback-similarity embeddings (positive examples)
-Image embedding model
-sentence-transformers/clip-ViT-B-32
-Used for:
-image vectorization
-text-to-image query matching
-automatic image topic labeling during ingestion
-LLM for answer generation
-Configurable LLM_MODEL (default: openai/gpt-4o)
-Accessed via OpenRouter when OPENROUTER_API_KEY exists, otherwise OpenAI
-Vector DB
-ChromaDB persistent local store (data/chroma)
-Orchestration
-LlamaIndex for text index/retrieval/generation pipeline
-Supporting stack
-Flask, python-dotenv, Pillow, sentence-transformers
-What should be optimized next (priority order)
-1) Improve image precision with deterministic labels
-Current topic labels are CLIP-predicted, so edge mismatches can still happen.
-Best upgrade: add manual/canonical tags per image during ingestion (or from document section metadata), and filter by those tags first.
-2) Strengthen retrieval ranking
-Replace fixed thresholds with calibrated thresholds per intent.
-Add reranking step for text chunks (cross-encoder reranker) before generation.
-Consider hybrid retrieval (BM25 + dense vectors).
-3) Improve chunking quality
-Use semantic chunking and chunk overlap instead of only markdown-structure chunking.
-Preserve section titles and source references in metadata for better answer grounding/citations.
-4) Make feedback loop safer and smarter
-Currently positive feedback influences style; add:
-decay/recency weighting
-role-scoped feedback weighting
-explicit negative-feedback penalties (avoid repeated bad answer patterns)
-moderation/validation of feedback data before indexing
-5) Add evaluation harness
-Create a test set of representative questions (text-only + image-request)
-Track metrics: answer faithfulness, retrieval precision@k, image mismatch rate, feedback acceptance rate
-Run regressions before updates to prompts/models/thresholds
-6) Performance and cost optimization
-Cache embeddings and retrieval outputs for repeated questions
-Preload models once (warm startup)
-Consider smaller/faster LLM for simple FAQ intents + fallback to stronger model
-7) Clean technical debt
-rag/openrouter_embedding.py appears present but not in active path; either integrate or remove to avoid confusion.
+# DentalBoutique RAG Assistant — Improvement Plan
+
+---
+
+## Project Description
+
+A Flask-based, role-aware multimodal RAG assistant for a dental clinic knowledge base. Answers questions for two personas (patient, staff) using only ingested internal documents. Optionally returns relevant document images when explicitly requested.
+
+---
+
+## End-to-End Architecture
+
+### Ingestion (`rag/ingestion.py`)
+- Reads `company_*.md` and `company_*.docx` from project root
+- Extracts DOCX text (XML parsing) and images (word/media/)
+- Chunks text via `MarkdownNodeParser`
+- Builds two Chroma collections:
+  - `dental_boutique_text` — text chunk embeddings
+  - `dental_boutique_images` — image embeddings + CLIP-predicted topic metadata
+- Rebuilds collections fresh on every run (destructive reindex)
+
+### Retrieval + Generation (`rag/retriever.py`)
+- Retrieves top-k text chunks by vector similarity, filtered by MIN_SCORE threshold
+- Rewrites follow-up questions into standalone queries using chat history
+- Injects positive feedback examples as answer-style guidance
+- Applies role-specific system prompt (`rag/prompts.py`)
+- Generates final answer via LLM
+- Image retrieval guardrails:
+  - Only triggered when user explicitly uses keywords (show, image, photo, etc.)
+  - Topic-matching filter prevents cross-procedure image leakage
+  - Similarity threshold gates image inclusion
+
+### Feedback Loop (`rag/feedback.py`, `/feedback`)
+- UI captures thumbs up / thumbs down per answer
+- All feedback stored in JSONL (full audit trail)
+- Only positive feedback indexed in `dental_boutique_feedback_positive`
+- On similar future questions, pulls top-k positive examples as prompt context
+
+### Frontend (`templates/index.html`)
+- Role selector (patient / staff), chat thread, image rendering
+- Thumbs up / down controls with submission state management
+
+---
+
+## Models & Tech Stack
+
+| Layer | Component | Detail |
+|---|---|---|
+| Text embeddings | `BAAI/bge-small-en-v1.5` | Chunk, query, and feedback embeddings (local CPU) |
+| Image embeddings | `clip-ViT-B-32` | Image vectorization, text-to-image matching, topic labeling (local CPU) |
+| LLM | Configurable via `LLM_MODEL` | Default: `openai/gpt-4o` via OpenRouter or OpenAI |
+| Vector DB | ChromaDB | Persistent local store (`data/chroma`) |
+| Orchestration | LlamaIndex | Text index / retrieval / generation pipeline |
+| Web | Flask + Gunicorn | Served on port 8080 |
+| Deployment | Fly.io | `yyz` region, 2 shared CPUs, 4 GB RAM, 5 GB persistent volume |
+
+---
+
+## Known Deployment Issues (Resolved)
+
+- Docker image exceeded 8 GB limit — fixed by installing CPU-only PyTorch before `requirements.txt`
+- Image ingestion OOM during `fly ssh console` ingestion — worked around by running ingestion locally and uploading ChromaDB via `fly sftp`
+- `auto_stop_machines = "stop"` causing cold-start delays — changed to `"off"`
+
+---
+
+## Improvement Roadmap (Priority Order)
+
+### P0 — Startup Performance (immediate)
+**Problem:** First chat request pays a ~10s model-load penalty because the embedding index loads lazily.
+**Fix:** Pre-warm `_get_index()` at gunicorn startup so the model is in memory before the first request arrives.
+**Files:** `app.py`, `rag/retriever.py`
+
+---
+
+### P1 — Image Precision
+**Problem:** CLIP-predicted topic labels can have edge mismatches (e.g., a crown image labeled as a bridge).
+**Fix:**
+- Add manual/canonical tags per image during ingestion, derived from document section headings or a sidecar JSON metadata file
+- Filter by manual tags first, fall back to CLIP similarity only when manual tag is absent
+- **Files:** `rag/ingestion.py`, `rag/retriever.py`
+
+---
+
+### P2 — Retrieval Ranking
+**Problem:** Fixed similarity thresholds (`MIN_SCORE=0.3`, hardcoded in `retriever.py` instead of `config.py`) treat all queries equally regardless of intent.
+**Fix:**
+- Move `MIN_SCORE` to `config.py`
+- Add a cross-encoder reranker step after initial retrieval to re-score and re-order chunks
+- Consider hybrid retrieval: BM25 sparse + dense vector, merged via Reciprocal Rank Fusion
+- **Files:** `rag/retriever.py`, `config.py`
+
+---
+
+### P3 — Chunking Quality
+**Problem:** `MarkdownNodeParser` creates chunks based on markdown structure only; no overlap, no section-title propagation.
+**Fix:**
+- Switch to semantic chunking with configurable overlap (e.g., 128 token overlap)
+- Preserve section title and source document reference in each chunk's metadata
+- Use metadata for citations in generated answers ("According to company_policies.md, section 3…")
+- **Files:** `rag/ingestion.py`
+
+---
+
+### P4 — Feedback Loop Safety
+**Problem:** All positive feedback is equally weighted, role-agnostic, and unmoderated. Negative feedback is logged but never used.
+**Fix:**
+- Add decay/recency weighting (older feedback scores lower)
+- Scope feedback collections by role (`feedback_positive_patient`, `feedback_positive_staff`)
+- Use negative feedback to inject "avoid this pattern" guidance into the LLM prompt
+- Add basic content validation before indexing (minimum length, no profanity)
+- **Files:** `rag/feedback.py`, `rag/retriever.py`
+
+---
+
+### P5 — Evaluation Harness
+**Problem:** No automated testing. Changes to prompts/models/thresholds are validated only by manual testing.
+**Fix:**
+- Build a test set of ~20 representative questions (text-only + image-request, patient + staff)
+- Track: answer faithfulness, retrieval precision@k, image mismatch rate, feedback acceptance rate
+- Run regression suite before any threshold or model change
+- **Files:** `tests/` (new directory)
+
+---
+
+### P6 — Performance & Cost
+**Problem:** Every query embeds the question on CPU (slow), calls GPT-4o regardless of question complexity (expensive).
+**Fix:**
+- Cache embeddings and retrieval results for repeated questions (e.g., Redis or in-memory LRU)
+- Tiered LLM strategy: route simple FAQ intents to a smaller/faster model (e.g., `gpt-4o-mini`), fall back to `gpt-4o` for complex or ambiguous queries
+- **Files:** `rag/retriever.py`, `config.py`
+
+---
+
+### P7 — Technical Debt
+- `rag/openrouter_embedding.py` is dead code — never imported. Either integrate as the embedding API fallback or delete.
+- Chat history `slice(-8)` in `index.html` is inconsistent with `HISTORY_MAX_TURNS=4` in `config.py` — align them.
+- **Files:** `rag/openrouter_embedding.py`, `templates/index.html`
