@@ -4,7 +4,6 @@ from datetime import datetime, timezone
 from flask import Flask, render_template, request, jsonify
 
 from rag.feedback import record_feedback
-from rag.ingestion import run_ingestion
 from rag.retriever import query
 
 app = Flask(__name__)
@@ -24,6 +23,9 @@ def _run_slash_command(message: str, role: str) -> dict:
         }
     if command == "/reindex":
         started_at = datetime.now(timezone.utc)
+        # Lazy import keeps app startup light for deployment health checks.
+        from rag.ingestion import run_ingestion
+
         run_ingestion()
         return {
             "response": (

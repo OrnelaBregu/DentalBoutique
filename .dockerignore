@@ -10,6 +10,7 @@ venv/
 env/
 .venv/
 data/
-*.md
-*.docx
+README.md
+instruction.md
+ImpromentPlan.md
 render.yaml

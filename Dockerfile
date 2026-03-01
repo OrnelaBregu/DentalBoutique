@@ -28,4 +28,4 @@ ENV VECTOR_STORE_PATH=/data/chroma \
 
 EXPOSE 8080
 
-CMD ["gunicorn", "--workers", "1", "--threads", "4", "--timeout", "180", "--bind", "0.0.0.0:8080", "app:app"]
+CMD ["gunicorn", "--workers", "2", "--threads", "2", "--timeout", "180", "--bind", "0.0.0.0:8080", "app:app"]
