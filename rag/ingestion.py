@@ -153,6 +153,7 @@ def run_ingestion() -> None:
     image_output_dir = Path(EXTRACTED_IMAGES_DIR)
     _clear_extracted_images_dir(image_output_dir)
     documents, image_assets = _load_documents(doc_paths, image_output_dir)
+    image_assets = []  # image indexing temporarily disabled
     if not documents and not image_assets:
         raise ValueError("No text or image content loaded. Check document files.")
 
