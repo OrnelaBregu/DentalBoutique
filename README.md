@@ -60,7 +60,7 @@ A Flask web app that lets **patients** and **staff** ask questions grounded in D
 | `VECTOR_STORE_PATH` | Chroma persistence directory | `./data/chroma` |
 | `DOCUMENTS_PATH` | Directory containing `company_*.md` | Project root |
 | `LLM_MODEL` | Chat model (OpenRouter: e.g. `openai/gpt-4o`) | `openai/gpt-4o` |
-| `TEXT_EMBEDDING_MODEL` | Local text embedding model | `BAAI/bge-small-en-v1.5` |
+| `TEXT_EMBEDDING_MODEL` | Local text embedding model | `qwen/qwen-2.5-72b-instruct` |
 | `IMAGE_EMBEDDING_MODEL` | Local image embedding model | `sentence-transformers/clip-ViT-B-32` |
 | `MODEL_CACHE_DIR` | Local model cache directory | `./data/model_cache` |
 | `TOP_K` | Number of chunks to retrieve per query | `5` |
