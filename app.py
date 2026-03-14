@@ -4,9 +4,15 @@ from datetime import datetime, timezone
 from flask import Flask, render_template, request, jsonify
 
 from rag.feedback import record_feedback
-from rag.retriever import query
+from rag.retriever import query, _get_index
 
 app = Flask(__name__)
+
+# Pre-load the embedding model at startup so the first chat request is fast.
+try:
+    _get_index()
+except Exception:
+    pass  # index not built yet; fails silently until /reindex is run
 
 
 def _run_slash_command(message: str, role: str) -> dict:
@@ -110,4 +116,4 @@ def feedback():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5000, use_reloader=False)

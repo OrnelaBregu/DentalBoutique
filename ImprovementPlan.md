@@ -59,7 +59,14 @@ A Flask-based, role-aware multimodal RAG assistant for a dental clinic knowledge
 ## Known Deployment Issues (Resolved)
 
 - Docker image exceeded 8 GB limit — fixed by installing CPU-only PyTorch before `requirements.txt`
+<<<<<<< HEAD
 - Image ingestion OOM during `fly ssh console` ingestion — worked around by running ingestion locally and uploading ChromaDB via `fly sftp`
+=======
+- Port mismatch between Dockerfile (hardcoded 8000) and fly.io default (8080) — fixed
+- `*.md` / `*.docx` files excluded from Docker image by `.dockerignore` — fixed; company docs now included
+- Image ingestion OOM during `fly ssh console` ingestion — worked around by running ingestion locally and uploading ChromaDB via `fly sftp`
+- `chroma.tar.gz` accidentally committed to git — removed and added to `.gitignore`
+>>>>>>> 536ee6e (readiness to deploy on streamlit)
 - `auto_stop_machines = "stop"` causing cold-start delays — changed to `"off"`
 
 ---

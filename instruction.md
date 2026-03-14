@@ -19,14 +19,23 @@ Then edit `.env` and set at least one key:
 
 ## 2) Daily fast-start (recommended order)
 
+**Flask:**
 ```bash
 cd /Users/ornelabregu/CodingTest
 source .venv/bin/activate
 python -m rag.ingestion
 flask run
 ```
-
 Open: `http://127.0.0.1:5000`
+
+**Streamlit:**
+```bash
+cd /Users/ornelabregu/CodingTest
+source .venv/bin/activate
+python -m rag.ingestion
+streamlit run streamlit_app.py
+```
+Open: `http://127.0.0.1:8501`
 
 ## 3) Fast dev checks after code changes
 
@@ -76,7 +85,15 @@ docker run -p 8000:8000 \
   dental-rag
 ```
 
-## 7) Render deploy notes
+## 7) Streamlit Community Cloud (free deploy)
+
+1. Push repo to GitHub.
+2. Go to [share.streamlit.io](https://share.streamlit.io) → New app.
+3. Repo: `OrnelaBregu/DentalBoutique`, main file: `streamlit_app.py`.
+4. Add secrets: `OPENROUTER_API_KEY` (or `OPENAI_API_KEY`).
+5. Deploy. On first load, click **🔄 Reindex documents** in the sidebar.
+
+## 8) Render deploy notes
 
 - `render.yaml` is ready.
 - `postDeployCommand` is not supported in service schema.
@@ -86,7 +103,7 @@ docker run -p 8000:8000 \
 python -m rag.ingestion
 ```
 
-## 8) Git quick flow
+## 9) Git quick flow
 
 ```bash
 cd /Users/ornelabregu/CodingTest
@@ -95,7 +112,7 @@ git commit -m "Update RAG app"
 git push origin main
 ```
 
-## 9) Common recovery commands
+## 10) Common recovery commands
 
 If model cache errors occur:
 

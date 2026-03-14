@@ -35,12 +35,9 @@ A Flask web app that lets **patients** and **staff** ask questions grounded in D
    - extracted images from `company_*.docx` (saved under `static/indexed_images`)
    - vectors in `./data/chroma`
 
-5. **Start the Flask app**
-   ```bash
-   flask run
-   # or: python app.py
-   ```
-   Open http://127.0.0.1:5000 in a browser.
+5. **Start the app**
+   - **Flask:** `flask run` or `python app.py` → http://127.0.0.1:5000
+   - **Streamlit:** `streamlit run streamlit_app.py` → http://127.0.0.1:8501
 
 ## Usage
 
@@ -74,9 +71,27 @@ A Flask web app that lets **patients** and **staff** ask questions grounded in D
 | `FEEDBACK_TOP_K` | Number of similar positive feedback examples to use | `2` |
 | `FEEDBACK_MIN_SIMILARITY` | Similarity threshold for applying positive feedback | `0.35` |
 
+## Deploy with Streamlit Community Cloud (free)
+
+1. Push your repo to GitHub.
+2. Go to [share.streamlit.io](https://share.streamlit.io) and sign in with GitHub.
+3. Click **New app**, select your repo, set:
+   - **Main file path:** `streamlit_app.py`
+   - **Branch:** `main`
+4. Add secrets in the app settings (Secrets):
+   ```toml
+   OPENROUTER_API_KEY = "sk-or-..."
+   # or: OPENAI_API_KEY = "sk-..."
+   ```
+5. Deploy. On first run, click **🔄 Reindex documents** in the sidebar to build the vector index (takes 1–2 minutes).
+6. Your app will be live at `https://your-app-name.streamlit.app`.
+
+**Note:** Free tier has ~1GB RAM. If the app crashes, try reducing `TOP_K` or `IMAGE_TOP_K` in secrets.
+
 ## Project layout
 
 - `app.py` – Flask app with `/chat` and `/feedback` endpoints  
+- `streamlit_app.py` – Streamlit app for local run and Streamlit Cloud deploy  
 - `config.py` – Settings from environment  
 - `rag/feedback.py` – Persist thumbs feedback and retrieve positive examples  
 - `rag/ingestion.py` – Rebuild text + image embeddings and save to Chroma  
